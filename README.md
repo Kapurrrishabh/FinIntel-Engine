@@ -1,5 +1,4 @@
-# FinIntel-Engine
-## FinIntel Engine - ML Models
+# FinIntel Engine - ML Models
 
 Machine Learning models and datasets for financial intelligence, including sentiment analysis and technical indicators.
 

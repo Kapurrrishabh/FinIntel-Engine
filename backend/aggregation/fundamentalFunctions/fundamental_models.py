@@ -1,5 +1,9 @@
 from typing import Dict, Any, Optional, Union
 import numpy as np
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def score_metric(
@@ -82,7 +86,10 @@ def fundamental_analysis(financial_data: Dict[str, float]) -> Dict[str, Any]:
     net_profit_margin = safe_divide(net_income, rev_t, default=0.0)
     roe = safe_divide(net_income, equity, default=0.0)
     debt_to_equity = safe_divide(debt, equity, default=float('inf'))
-    current_ratio = safe_divide(current_assets, current_liabilities, default=0.0)
+    if not current_assets or not current_liabilities:
+        current_ratio = None
+    else:
+        current_ratio = safe_divide(current_assets, current_liabilities, default=0.0)
     interest_coverage = safe_divide(ebit, interest_expense, default=0.0)
     
     # Store raw metrics
@@ -91,33 +98,31 @@ def fundamental_analysis(financial_data: Dict[str, float]) -> Dict[str, Any]:
         "net_profit_margin": round(net_profit_margin, 4),
         "return_on_equity": round(roe, 4),
         "debt_to_equity": round(debt_to_equity, 4) if not np.isinf(debt_to_equity) else None,
-        "current_ratio": round(current_ratio, 4),
+        "current_ratio": round(current_ratio, 4) if current_ratio is not None else None,
         "interest_coverage": round(interest_coverage, 4)
     }
+
+    if current_ratio is None:
+        logger.info("Liquidity data missing, skipping liquidity evaluation")
     
     # Calculate normalized sub-scores (0 to 1)
+    if current_ratio is None:
+        liquidity_score = None
+    else:
+        liquidity_score = min(current_ratio / 2, 1.0)
+
     sub_scores = {
         "revenue_growth": round(score_metric(revenue_growth, 0.10, 0.0), 4),
         "profitability": round(score_metric(net_profit_margin, 0.15, 0.05), 4),
         "return_on_equity": round(score_metric(roe, 0.18, 0.08), 4),
         "debt_health": round(score_metric(debt_to_equity, 1.0, 2.0, reverse=True), 4),
-        "liquidity": round(score_metric(current_ratio, 1.5, 1.0), 4),
+        "liquidity": round(liquidity_score, 4) if liquidity_score is not None else None,
         "interest_coverage": round(score_metric(interest_coverage, 5.0, 2.0), 4)
     }
     
-    # Calculate weighted fundamental score
-    weights = {
-        "revenue_growth": 0.15,
-        "profitability": 0.20,
-        "return_on_equity": 0.20,
-        "debt_health": 0.15,
-        "liquidity": 0.15,
-        "interest_coverage": 0.15
-    }
-    
-    fundamental_score = sum(
-        sub_scores[key] * weights[key] for key in sub_scores
-    )
+    # Calculate fundamental score from available (non-missing) sub-scores only.
+    valid_scores = [score for score in sub_scores.values() if score is not None]
+    fundamental_score = sum(valid_scores) / len(valid_scores) if valid_scores else 0.0
     
     return {
         "fundamental_score": round(fundamental_score, 4),
@@ -267,8 +272,10 @@ def gatekeeping(
         }
     
     # Rule 4: Liquidity Check
-    liquidity_score = sub_scores.get("liquidity", 0)
-    if liquidity_score < cfg["min_liquidity_score"]:
+    liquidity_score = sub_scores.get("liquidity", None)
+    if liquidity_score is None:
+        logger.info("Liquidity data missing, skipping liquidity evaluation")
+    elif liquidity_score < cfg["min_liquidity_score"]:
         return {
             "status": "REJECT",
             "reason": f"Liquidity concerns (score: {liquidity_score:.2f}). "

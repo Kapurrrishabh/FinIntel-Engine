@@ -1,0 +1,16 @@
+numpy
+pandas
+yfinance
+pandas_ta
+vaderSentiment
+transformers
+torch
+datasets
+scikit-learn
+matplotlib
+seaborn
+tensorflow
+keras
+pyyaml
+python-dotenv
+snscrape

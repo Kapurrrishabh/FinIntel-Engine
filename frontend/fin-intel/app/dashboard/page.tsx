@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  FinIntel · Complete Dashboard
 // ─────────────────────────────────────────────────────────────────────────────
+import { Suspense } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -1344,6 +1345,14 @@ function SearchBar({ onSelect, activeSymbol }: { onSelect: (s: string) => void; 
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="text-center mt-20">Loading Dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+function DashboardContent() {
   const searchParams                    = useSearchParams();
   const [view, setView]                 = useState<View>("dashboard");
   const [activeSymbol, setActiveSymbol] = useState<string | null>(searchParams.get("symbol") || null);

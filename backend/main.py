@@ -268,7 +268,6 @@ def get_market_data() -> dict:
 def get_stock_analysis(
     ticker: str = Path(..., min_length=1, max_length=20, description="Stock ticker symbol"),
 ) -> dict:
-    """Full ML pipeline: technical + sentiment + fundamental analysis."""
     ticker = normalize_ticker(ticker)
     cache_key = f"stock:{ticker}"
 
@@ -278,9 +277,10 @@ def get_stock_analysis(
         return {**cached, "cached": True}
 
     print(f"🔬 CACHE MISS — running ML pipeline for {ticker}…")
+
     try:
-        result    = run_complete_pipeline(ticker)
-        price_df  = _get_price_data(ticker)
+        result   = run_complete_pipeline(ticker)
+        price_df = _get_price_data(ticker)
 
         prices = [
             {"date": str(idx.date()), "close": round(float(row["Close"]), 4)}
@@ -288,35 +288,63 @@ def get_stock_analysis(
         ] if price_df is not None and not price_df.empty else []
 
         fundamentals: dict[str, Any] = {
-            "roe": None, "debt_equity": None, "revenue_growth": None,
-            "profit_margin": None, "market_cap": None, "pe_ratio": None, "eps": None,
+            "roe": None,
+            "debt_equity": None,
+            "revenue_growth": None,
+            "profit_margin": None,
+            "market_cap": None,
+            "pe_ratio": None,
+            "eps": None,
         }
 
+        # ───────── FUNDAMENTAL MODEL DATA ─────────
         try:
             metrics = result["fundamental"]["details"]["fundamental"]["metrics"]
+
+            roe = metrics.get("return_on_equity")
+            rev_growth = metrics.get("revenue_growth")
+            margin = metrics.get("net_profit_margin")
+
             fundamentals.update({
-                "roe":            round((metrics.get("return_on_equity") or 0) * 100, 2),
-                "debt_equity":    metrics.get("debt_to_equity"),
-                "revenue_growth": round((metrics.get("revenue_growth") or 0) * 100, 2),
-                "profit_margin":  round((metrics.get("net_profit_margin") or 0) * 100, 2),
+                "roe": round(roe * 100, 2) if roe is not None else None,
+                "debt_equity": metrics.get("debt_to_equity"),
+                "revenue_growth": round(rev_growth * 100, 2) if rev_growth is not None else None,
+                "profit_margin": round(margin * 100, 2) if margin is not None else None,
             })
         except Exception:
             pass
 
+        # ───────── MARKET DATA (FIXED PART) ─────────
         try:
-            info = yf.Ticker(ticker).info
-            fundamentals.update({
-                "market_cap": info.get("marketCap"),
-                "pe_ratio":   info.get("trailingPE") or info.get("forwardPE"),
-                "eps":        info.get("trailingEps") or info.get("forwardEps"),
-                "sector":     info.get("sector"),
-                "industry":   info.get("industry"),
-                "name":       info.get("longName") or info.get("shortName"),
-                "website":    info.get("website"),
-            })
-        except Exception:
-            pass
+            stock = yf.Ticker(ticker)
 
+            try:
+                info = stock.info or {}
+            except Exception:
+                info = {}
+
+            try:
+                fast = stock.fast_info or {}
+            except Exception:
+                fast = {}
+
+            fundamentals.update({
+                "market_cap": info.get("marketCap") or getattr(fast, "market_cap", None),
+                "pe_ratio": info.get("trailingPE") or info.get("forwardPE"),
+                "eps": info.get("trailingEps") or info.get("forwardEps"),
+                "beta": info.get("beta"),
+                "dividend_yield": info.get("dividendYield"),
+                "avg_volume": info.get("averageVolume") or getattr(fast, "ten_day_average_volume", None),
+                "sector": info.get("sector"),
+                "industry": info.get("industry"),
+                "name": info.get("longName") or info.get("shortName"),
+                "website": info.get("website"),
+            })
+
+        except Exception as e:
+            print(f"⚠️ Fundamentals fetch failed: {e}")
+
+        # ───────── SCORES ─────────
         tech   = result.get("technical", {})
         sent   = result.get("sentiment", {})
         signal = tech.get("signal", "neutral")
@@ -329,17 +357,17 @@ def get_stock_analysis(
         )
 
         response = safe_json({
-            "symbol":           ticker,
-            "name":             fundamentals.get("name", ticker),
-            "prices":           prices,
-            "technical_score":  round(tech.get("technical_score", 0.5), 4),
+            "symbol": ticker,
+            "name": fundamentals.get("name", ticker),
+            "prices": prices,
+            "technical_score": round(tech.get("technical_score", 0.5), 4),
             "technical_signal": signal,
-            "sentiment_score":  round(sent.get("sentiment_score", 0.5), 4),
-            "fundamentals":     fundamentals,
-            "final_score":      round(result.get("final_score", 0.5), 4),
-            "decision":         result.get("decision", "HOLD"),
-            "explanation":      explanation.strip(),
-            "generated_at":     time.time(),
+            "sentiment_score": round(sent.get("sentiment_score", 0.5), 4),
+            "fundamentals": fundamentals,
+            "final_score": round(result.get("final_score", 0.5), 4),
+            "decision": result.get("decision", "HOLD"),
+            "explanation": explanation.strip(),
+            "generated_at": time.time(),
         })
 
         cache.set(cache_key, response, CACHE_TTL_STOCK)
@@ -541,4 +569,4 @@ def invalidate_cache(key: str) -> dict:
 
 @app.get("/cache/stats")
 def cache_stats() -> dict:
-    return cache.stats()
+    return cache.stats()    

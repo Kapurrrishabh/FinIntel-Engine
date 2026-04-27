@@ -1,5 +1,6 @@
-"use client";
 
+"use client";
+import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1285,6 +1286,14 @@ function SearchAddBar({
 // ============================================================
 
 export default function ComparePage() {
+  return (
+    <Suspense fallback={<div className="text-center mt-20">Loading Compare...</div>}>
+      <ComparePageContent />
+    </Suspense>
+  );
+}
+
+function ComparePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -1626,3 +1635,4 @@ export default function ComparePage() {
     </main>
   );
 }
+

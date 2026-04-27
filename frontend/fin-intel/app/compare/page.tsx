@@ -109,17 +109,14 @@ const fmt = {
 
 function getAccessorValue(data: StockData, key: string): number | undefined {
   if (key.includes(".")) {
-    const parts = key.split(".");
-    const field = parts[1];
-
+    const [, field] = key.split(".");
     if (!field) return undefined;
 
     return (data.fundamentals as unknown as Record<string, number | undefined>)[field];
   }
 
- return (data as unknown as Record<string, unknown>)[key] as number | undefined;
+  return (data as unknown as Record<string, unknown>)[key] as number | undefined;
 }
-
 function getSentimentColor(sentiment?: string) {
   if (sentiment === "bullish") return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
   if (sentiment === "bearish") return "text-rose-400 bg-rose-500/10 border-rose-500/20";

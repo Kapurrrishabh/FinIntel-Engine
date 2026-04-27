@@ -109,10 +109,15 @@ const fmt = {
 
 function getAccessorValue(data: StockData, key: string): number | undefined {
   if (key.includes(".")) {
-    const [, field] = key.split(".");
-    return (data.fundamentals as Record<string, number | undefined>)[field];
+    const parts = key.split(".");
+    const field = parts[1];
+
+    if (!field) return undefined;
+
+    return (data.fundamentals as unknown as Record<string, number | undefined>)[field];
   }
-  return (data as Record<string, unknown>)[key] as number | undefined;
+
+ return (data as unknown as Record<string, unknown>)[key] as number | undefined;
 }
 
 function getSentimentColor(sentiment?: string) {

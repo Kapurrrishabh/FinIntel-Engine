@@ -8,3 +8,4 @@ scikit-learn
 pyyaml
 python-dotenv
 snscrape
+httpx 

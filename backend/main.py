@@ -241,7 +241,9 @@ def health_check() -> dict:
         "timestamp": time.time(),
     }
 
-
+@app.get("/ping")
+def ping():
+    return {"message": "pong"}
 # ── MARKET ───────────────────────────────────
 
 @app.get("/market")

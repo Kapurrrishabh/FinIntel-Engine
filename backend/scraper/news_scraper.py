@@ -59,10 +59,12 @@ REQUEST_TIMEOUT = 15
 
 
 class NewsItem(TypedDict):
+    title: str       # ADDED
     text: str
     date: str
     source: str
     ticker: str
+    url: str         # ADDED
 
 
 @dataclass(frozen=True)
@@ -177,12 +179,14 @@ def _is_recent(value: str, cutoff: date) -> bool:
     return cutoff <= parsed <= datetime.now(timezone.utc).date()
 
 
-def _build_item(text: str, date_value: str, source: str, ticker: str) -> NewsItem:
+def _build_item(title: str, text: str, date_value: str, source: str, ticker: str, url: str) -> NewsItem:
     return {
+        "title": title,
         "text": text,
         "date": date_value,
         "source": source,
         "ticker": ticker,
+        "url": url,
     }
 
 
@@ -318,11 +322,13 @@ def fetch_news_api(ticker: str) -> List[Dict]:
             description = _clean_text(article.get("description"))
             combined_text = _clean_text(" ".join(part for part in [title, description] if part))
             article_date = _format_date(article.get("publishedAt"))
+            url = article.get("url", "") # Grab the URL
 
             if len(combined_text) < MIN_TEXT_LENGTH or article_date is None:
                 continue
 
-            items.append(_build_item(combined_text, article_date, "API", context.normalized_ticker))
+            # Pass title and url to _build_item
+            items.append(_build_item(title, combined_text, article_date, "API", context.normalized_ticker, url))
 
         finalized = _finalize_items(items, context.cutoff_date)
         logger.info("NewsAPI returned %d items for %s", len(finalized), context.normalized_ticker)
@@ -420,10 +426,23 @@ def fetch_et_news(ticker: str) -> List[Dict]:
                 combined_text = _clean_text(" ".join(part for part in [title_text, snippet_text] if part))
                 article_date = _format_date(date_text)
 
+                # 🔥 Extract URL for Economic Times
+                article_url = ""
+                link_tag = container.find("a", href=True)
+                if link_tag:
+                    href = link_tag["href"]
+                    if href.startswith("/"):
+                        article_url = f"https://economictimes.indiatimes.com{href}"
+                    else:
+                        article_url = href
+
                 if len(combined_text) < MIN_TEXT_LENGTH or article_date is None:
                     continue
 
-                items.append(_build_item(combined_text, article_date, "ET", context.normalized_ticker))
+                display_title = title_text if title_text else f"{context.normalized_ticker} Market Update"
+                
+                # Pass all 6 arguments
+                items.append(_build_item(display_title, combined_text, article_date, "ET", context.normalized_ticker, article_url))
 
         finalized = _finalize_items(items[:MAX_ET_RESULTS], context.cutoff_date)
         logger.info("Economic Times returned %d items for %s", len(finalized), context.normalized_ticker)
@@ -468,11 +487,18 @@ def fetch_twitter_news(ticker: str) -> List[Dict]:
             tweet_text = _clean_text(getattr(tweet, "content", ""))
             tweet_date = getattr(tweet, "date", None)
             formatted_date = _format_date(tweet_date)
+            
+            # 🔥 Extract Twitter URL and create a Title
+            tweet_url = getattr(tweet, "url", "")
+            user_obj = getattr(tweet, "user", None)
+            username = getattr(user_obj, "username", "User") if user_obj else "User"
+            title = f"X Post by @{username}"
 
             if len(tweet_text) < MIN_TEXT_LENGTH or formatted_date is None:
                 continue
 
-            items.append(_build_item(tweet_text, formatted_date, "Twitter", context.normalized_ticker))
+            # Pass all 6 arguments
+            items.append(_build_item(title, tweet_text, formatted_date, "Twitter", context.normalized_ticker, tweet_url))
 
         finalized = _finalize_items(items, context.cutoff_date)
         logger.info("Twitter returned %d items for %s", len(finalized), context.normalized_ticker)
@@ -509,11 +535,15 @@ def fetch_google_news(ticker: str) -> List[Dict]:
             description = _clean_text(entry.description.get_text(" ", strip=True) if entry.description else "")
             text = _clean_text(" ".join(part for part in [title, description] if part))
             published = _format_date(entry.pubDate.get_text(strip=True) if entry.pubDate else None)
+            
+            # 🔥 Extract URL correctly
+            url = entry.link.get_text(strip=True) if entry.link else ""
 
             if len(text) < MIN_TEXT_LENGTH or published is None:
                 continue
 
-            items.append(_build_item(text, published, "Google", context.normalized_ticker))
+            # Pass all 6 arguments
+            items.append(_build_item(title, text, published, "Google", context.normalized_ticker, url))
 
         finalized = _finalize_items(items, context.cutoff_date)
         logger.info("Google News returned %d items for %s", len(finalized), context.normalized_ticker)
@@ -546,9 +576,12 @@ def fetch_reddit_news(ticker: str) -> List[Dict]:
 
         for child in children:
             data = child.get("data", {}) if isinstance(child, dict) else {}
+            
+            # 🔥 Extract Title
             title = _clean_text(data.get("title", ""))
             body = _clean_text(data.get("selftext", ""))
             text = _clean_text(" ".join(part for part in [title, body] if part))
+            
             if len(text) < MIN_TEXT_LENGTH:
                 continue
 
@@ -559,14 +592,21 @@ def fetch_reddit_news(ticker: str) -> List[Dict]:
             created_utc = data.get("created_utc")
             date_value = None
             try:
-                date_value = datetime.utcfromtimestamp(float(created_utc)).date().isoformat()
+                # 🔥 Fixed datetime conversion
+                date_value = datetime.fromtimestamp(float(created_utc), timezone.utc).date().isoformat()
             except Exception:
                 date_value = None
 
             if not date_value:
                 continue
 
-            items.append(_build_item(text, date_value, "Reddit", context.normalized_ticker))
+            # 🔥 Extract URL
+            url = ""
+            if data.get("permalink"):
+                url = f"https://www.reddit.com{data.get('permalink')}"
+
+            # Pass all 6 arguments
+            items.append(_build_item(title, text, date_value, "Reddit", context.normalized_ticker, url))
 
         finalized = _finalize_items(items, context.cutoff_date)
         logger.info("Reddit returned %d items for %s", len(finalized), context.normalized_ticker)

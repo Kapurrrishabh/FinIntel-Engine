@@ -18,7 +18,7 @@ import {
 // CONSTANTS & CONFIG
 // ============================================================
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
 
 const CHART_COLORS = ["#7C3AED", "#2563EB", "#059669", "#D97706"];
 const CHART_RANGES = ["1W", "1M", "3M", "1Y"] as const;

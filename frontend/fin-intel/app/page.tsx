@@ -246,8 +246,7 @@ const SearchBar = ({ onSearch }: { onSearch: (sym: string) => void }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000";
-
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
   const { data: searchResults, isValidating: isSearching } = useSWR<SearchResult[]>(
     debouncedSymbol ? `${API_BASE}/search/${encodeURIComponent(debouncedSymbol)}` : null,
     fetcher
@@ -729,7 +728,7 @@ export default function Home() {
   const [watchlist, setWatchlist] = useLocalStorage<string[]>("fin_watchlist", []);
   const countdown = useMarketCountdown(marketOpen);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8000";
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
 
   useEffect(() => {
     setMarketOpen(checkIsIndianMarketOpen());

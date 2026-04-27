@@ -30,7 +30,7 @@ ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip,
 // CONSTANTS & CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+const API = process.env.NEXT_PUBLIC_API_URL!;
 
 type View = "dashboard" | "portfolio" | "alerts" | "compare";
 type Period = "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL";

@@ -1,2 +1,4 @@
-export const fetcher = (url: string) => fetch(url).then((res) => res.json());
-export const API_BASE = "http://127.0.0.1:8000";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
+
+export const fetcher = (path: string) =>
+  fetch(`${API_BASE}${path}`).then((res) => res.json());

@@ -37,7 +37,7 @@ export default function StockCard({ symbol }: { symbol: string }) {
   } = useQuery<StockData>({
     queryKey: ["stock", symbol],
     queryFn: async () => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL!;
       const res = await fetch(`${baseUrl}/stock/${symbol}`);
       if (!res.ok) throw new Error("Failed to fetch stock");
       return res.json();
@@ -49,7 +49,7 @@ export default function StockCard({ symbol }: { symbol: string }) {
   const { data: newsData = [] } = useQuery({
     queryKey: ["news", symbol],
     queryFn: async () => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL!;
       const res = await fetch(`${baseUrl}/news/${symbol}`);
       if (!res.ok) throw new Error("Failed to fetch news");
       const json = await res.json();
@@ -60,7 +60,7 @@ export default function StockCard({ symbol }: { symbol: string }) {
   // ➕ Add to portfolio
   const addToPortfolio = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+      const baseUrl =process.env.NEXT_PUBLIC_API_URL!;
       await fetch(`${baseUrl}/portfolio/add`, {
         method: "POST",
         headers: {

@@ -60,6 +60,23 @@ def _safe_float(value: object, default: float = 0.0) -> float:
 
 
 def _to_builtin(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _to_builtin(v) for k, v in value.items()}
+
+    if isinstance(value, list):
+        return [_to_builtin(v) for v in value]
+
+    if isinstance(value, tuple):
+        return tuple(_to_builtin(v) for v in value)
+
+    if isinstance(value, np.generic):
+        value = value.item()
+
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return 0.0
+
+    return value
     """Recursively convert numpy/pandas scalar types to JSON-safe Python types."""
 
     if isinstance(value, dict):
@@ -326,7 +343,11 @@ def get_sentiment_result(ticker: str) -> dict:
 
     base_sentiment_score = float(np.mean(scores))
     news_volume_score = _compute_news_volume_score(len(texts))
-    sentiment_score = float(np.clip((0.85 * base_sentiment_score) + (0.15 * news_volume_score), 0.0, 1.0))
+    sentiment_score = float(np.clip(
+    (0.75 * base_sentiment_score) +
+    (0.25 * news_volume_score),
+    0.0, 1.0
+))
     _store_sentiment_cache(cleaned_ticker, sentiment_score, len(texts), news_volume_score)
 
     logger.info("Sentiment completed for %s with %d articles", cleaned_ticker, len(texts))
@@ -384,6 +405,46 @@ def get_fundamental_result(ticker: str) -> dict:
 
 
 def fuse_and_decide(tech, fund, senti, risk):
+    tech_score = tech.get('technical_score', 0.5)
+    fund_score = fund.get('fundamental_score', 0.0) if isinstance(fund, dict) else 0.0
+    senti_score = senti.get('sentiment_score', 0.5)
+    risk_score = risk.get('risk_score', 0.0)
+
+    # ✅ FIX 1: risk should REDUCE score
+    risk_penalty = 1 - risk_score
+
+    # ✅ FIX 2: amplify strong news impact
+    if senti_score > 0.7:
+        senti_score += 0.1
+    elif senti_score < 0.3:
+        senti_score -= 0.1
+
+    senti_score = max(0, min(1, senti_score))
+
+    # ✅ FIX 3: better weights
+    final_score = (
+        0.35 * tech_score +
+        0.35 * fund_score +
+        0.25 * senti_score +
+        0.05 * risk_penalty
+    )
+    final_score = float(np.clip(final_score, 0, 1))
+    
+    # ✅ base decision
+    if final_score >= 0.70:
+        decision = 'BUY'
+    elif final_score >= 0.45:
+        decision = 'HOLD'
+    else:
+        decision = 'SELL'
+
+    # 🔥 FIX 4: NEWS OVERRIDE (VERY IMPORTANT)
+    if senti_score < 0.25:
+        decision = 'SELL (Negative News Impact)'
+    elif senti_score > 0.75:
+        decision = 'BUY (Positive News Momentum)'
+
+    return float(final_score), decision
     tech_score = tech.get('technical_score', 0.5)
     fund_score = fund.get('fundamental_score', 0.0) if isinstance(fund, dict) else 0.0
     senti_score = senti.get('sentiment_score', 0.5)

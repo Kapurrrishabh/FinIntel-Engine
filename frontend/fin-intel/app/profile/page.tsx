@@ -1,5 +1,5 @@
 "use client";
-
+import { Suspense } from "react";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -80,6 +80,14 @@ const StatCard = ({ icon, label, value, color }: { icon: React.ReactNode; label:
 // PAGE
 // ─────────────────────────────────────────────
 export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="text-center mt-20">Loading Profile...</div>}>
+      <ProfileContent />
+    </Suspense>
+  );
+}
+
+function ProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();
